@@ -15,10 +15,12 @@
 #include <maya/MFnCompoundAttribute.h>
 #include <maya/MItGeometry.h>
 #include <maya/MPoint.h>
+#include <maya/MFloatPointArray.h>
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
 #include <maya/MFnMesh.h>
 #include <maya/MFnMeshData.h>
+#include <maya/MItMeshVertex.h>
 
 #include <vector>
 
@@ -36,6 +38,12 @@ public:
                    const MMatrix& mat,
                    unsigned int multiIndex) override;
     MStatus compute(const MPlug& plug, MDataBlock &block) override;
+    MStatus initializeCache(const MObject& refMesh);
+    bool collides(const MPoint &point,
+                  MMeshIntersector &intersector,
+                  MVector &toColliderPoint,
+                  MStatus &status);
+
     static const MTypeId id;
 
     static MObject aCollider;
@@ -44,7 +52,7 @@ public:
     static MObject aPreserveVolumeWeight;
     static MObject aCachedGeometry;
 
-    MObject cachedGeometry;
+    MObject cachedMeshData;
 };
 
 
