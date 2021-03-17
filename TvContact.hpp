@@ -5,6 +5,7 @@
 #ifndef MAYADEV_TVCONTACT_HPP
 #define MAYADEV_TVCONTACT_HPP
 
+#include "Smooth.hpp"
 #include "VolumePreservation.hpp"
 
 #include <maya/MPxDeformerNode.h>
@@ -49,8 +50,15 @@ public:
     static MObject aCollider;
     static MObject aColliderMesh;
     static MObject aColliderMatrix;
+
+    static MObject aSmoothIterations;
+    static MObject aSmoothStrength;
+
     static MObject aPreserveVolumeWeight;
+
     static MObject aCachedGeometry;
+
+
 
     MObject cachedMeshData;
 };

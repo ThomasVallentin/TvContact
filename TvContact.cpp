@@ -4,13 +4,14 @@
 
 #include "TvContact.hpp"
 
-
 const MTypeId TvContact::id(0x00003684);
 
 MObject TvContact::aCollider;
 MObject TvContact::aColliderMesh;
 MObject TvContact::aColliderMatrix;
 MObject TvContact::aPreserveVolumeWeight;
+MObject TvContact::aSmoothIterations;
+MObject TvContact::aSmoothStrength;
 MObject TvContact::aCachedGeometry;
 
 
@@ -43,18 +44,34 @@ MStatus TvContact::initialize()
 
     addAttribute(aCollider);
 
+    aSmoothIterations = nAttr.create("smoothIterations", "smoothIterations", MFnNumericData::kInt);
+    nAttr.setMin(0);
+    nAttr.setDefault(2);
+    addAttribute(aSmoothIterations);
+    attributeAffects(aSmoothIterations, outputGeom);
+
+    aSmoothStrength = nAttr.create("smoothStrength", "smoothStrength", MFnNumericData::kFloat);
+    nAttr.setMin(0);
+    nAttr.setMax(1);
+    nAttr.setDefault(0.5);
+    addAttribute(aSmoothStrength);
+    attributeAffects(aSmoothStrength, outputGeom);
+
+    aPreserveVolumeWeight = nAttr.create("volumePreserve", "volumePreserve", MFnNumericData::kFloat);
+    addAttribute(aPreserveVolumeWeight);
+    attributeAffects(aPreserveVolumeWeight, outputGeom);
+
     aCachedGeometry = tAttr.create("cachedMeshData", "cachedMeshData", MFnData::kMesh);
     addAttribute(aCachedGeometry);
     attributeAffects(outputGeom, aCachedGeometry);
     attributeAffects(aColliderMesh, aCachedGeometry);
     attributeAffects(aColliderMatrix, aCachedGeometry);
     attributeAffects(aCollider, aCachedGeometry);
+    attributeAffects(aSmoothIterations, aCachedGeometry);
+    attributeAffects(aSmoothStrength, aCachedGeometry);
     attributeAffects(input, aCachedGeometry);
     attributeAffects(inputGeom, aCachedGeometry);
 
-    aPreserveVolumeWeight = nAttr.create("volumePreserve", "volumePreserve", MFnNumericData::kFloat);
-    addAttribute(aPreserveVolumeWeight);
-    attributeAffects(aPreserveVolumeWeight, outputGeom);
 
     return MS::kSuccess;
 }
@@ -86,6 +103,8 @@ MStatus TvContact::deform(MDataBlock& block, MItGeometry& itGeo,
     // Get numeric attributes values
     float env = block.inputValue(envelope).asFloat();
     float preserveVolume = block.inputValue(aPreserveVolumeWeight).asFloat();
+    int smoothIterations = block.inputValue(aSmoothIterations).asInt();
+    float smoothStrength = block.inputValue(aSmoothStrength).asFloat();
 
     // Getting input mesh by going through input -> input[i] -> inputGeom
     // We get the output value since the input has already been computed during the
@@ -101,7 +120,6 @@ MStatus TvContact::deform(MDataBlock& block, MItGeometry& itGeo,
     MFnMesh fnCollider(oColliderMesh);
 
     double preVolume = polygonMeshVolume(oInputMesh, localToWorldMatrix);
-    double dot;
 
     // Ensure cachedMeshData contains a mesh
     if (cachedMeshData.isNull())
@@ -119,23 +137,36 @@ MStatus TvContact::deform(MDataBlock& block, MItGeometry& itGeo,
 
 //    std::vector<int> collidedIds;
     MPoint cachedPoint, origPoint;
-    MVector delta, cachedPointToOrig;
-    for (; !itGeo.isDone(); itGeo.next()) {
-        fnCachedMesh.getPoint(itGeo.index(), cachedPoint);
-        cachedPoint *= localToWorldMatrix;
+    MVector cachedPointToOrig;
+    
+    // Getting original points and set it as the base for the output points
+    MPointArray origPoints, cachedPoints, outPositions;
+    MVectorArray deltas;
+    itGeo.allPositions(outPositions);
 
+    unsigned int pointCount = outPositions.length();
+    deltas.setLength(pointCount);
+    origPoints.setLength(pointCount);
+
+    // Copying all positions to origPoints and transform them in world space
+    for ( size_t i=0; i < pointCount ; i++ )
+        origPoints[i] = outPositions[i] * localToWorldMatrix;
+
+    // Get all the points from the cache in world space
+    fnCachedMesh.getPoints(cachedPoints, MSpace::kWorld);
+    for (auto &pt : cachedPoints)
+        pt *= localToWorldMatrix;
+
+    // == COLLISION DETECTION ============================================================
+
+    for ( size_t i=0 ; i < pointCount ; i++ ) {
+        cachedPoint = cachedPoints[i];
+        origPoint = origPoints[i];
+        MVector delta;
         if (collides(cachedPoint, intersector, delta, status)) {
-//            collidedIds.push_back(itGeo.index());
-            cachedPoint += delta * env;
-            cachedPoint *= worldToLocalMatrix;
-            itGeo.setPosition(cachedPoint);
+            delta += cachedPoint - origPoint;
         }
         else {
-            // The cached point doesn't collide, check if there is a collider between
-            // the cache and the original mesh
-            origPoint = itGeo.position();
-            origPoint *= localToWorldMatrix;
-
             cachedPointToOrig = origPoint - cachedPoint;
 
             MFloatPoint hitPoint;
@@ -154,23 +185,29 @@ MStatus TvContact::deform(MDataBlock& block, MItGeometry& itGeo,
                                                nullptr,
                                                nullptr,
                                                nullptr)) {
-//                collidedIds.push_back(itGeo.index());
-                delta = MPoint(hitPoint) - cachedPoint;
-                cachedPoint += delta * env;
-                cachedPoint *= worldToLocalMatrix;
-                itGeo.setPosition(cachedPoint);
+                delta = (MPoint(hitPoint) - origPoint);
             }
-
+            else {
+                delta = MVector(0, 0, 0);
+            }
         }
+        deltas[i] = delta * worldToLocalMatrix;
     }
 
+    // == SMOOTH =========================================================================
+    std::cout << deltas[pointCount-1] << std::endl;
+    laplacianSmooth(deltas, oInputMesh, smoothStrength, smoothIterations);
+    for ( size_t i=0 ; i < pointCount ; i++ ) {
+        outPositions[i] += deltas[i] * env;
+    }
+    std::cout << deltas[pointCount-1] << std::endl;
+    itGeo.setAllPositions(outPositions);
 
     // == VOLUME PRESERVATION ============================================================
 
-    double postVolume = polygonMeshVolume(oInputMesh, localToWorldMatrix);
-    double volumeDelta = std::max(0.0, preVolume - postVolume);
-    std::cout << "volumeDelta : " << volumeDelta << std::endl;
-
+//    double postVolume = polygonMeshVolume(oInputMesh, localToWorldMatrix);
+//    double volumeDelta = std::max(0.0, preVolume - postVolume);
+//
 //    // Not enough volume loss, returning before preserving phase
 //    if (volumeDelta < 1e-8 || preserveVolume < 1e-8)
 //        return MS::kSuccess;
