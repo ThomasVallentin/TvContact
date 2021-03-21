@@ -24,7 +24,9 @@
 #include <maya/MItMeshVertex.h>
 
 #include <vector>
+#include <map>
 
+#define PI 3.14159265
 
 class TvContact : public MPxDeformerNode
 {
@@ -55,6 +57,7 @@ public:
     static MObject aSmoothStrength;
 
     static MObject aPreserveVolumeWeight;
+    static MObject aPreserveVolumeRadius;
 
     static MObject aCachedGeometry;
 

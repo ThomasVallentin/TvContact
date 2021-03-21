@@ -31,6 +31,15 @@ double triangleAera(MPointArray& triPoints)
 	return cross.length() / 2.0f;
 }
 
+double triangleAera(const MPoint &a, const MPoint &b, const MPoint &c)
+{
+	// Aera of a triangle ABC == |AB x AC| / 2
+	MVector v1(b - a);
+	MVector v2(c - a);
+
+	return (v1 ^ v2).length() / 2.0f;
+}
+
 MPoint barycenter(MPointArray& points)
 {
 	MPoint point;

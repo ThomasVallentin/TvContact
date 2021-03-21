@@ -9,6 +9,7 @@
 
 double tetrahedralVolume(MPointArray& tetPoints);
 double triangleAera(MPointArray& triPoints);
+double triangleAera(const MPoint &a, const MPoint &b, const MPoint &c);
 MPoint barycenter(MPointArray& points);
 double polygonMeshVolume(MObject& inputMesh, const MMatrix& meshWorldMatrix);
 
