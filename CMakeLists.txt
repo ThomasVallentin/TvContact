@@ -23,4 +23,4 @@ set(EXECUTABLE_OUTPUT_PATH  ${CMAKE_CURRENT_SOURCE_DIR}/libraries)
 include_directories($ENV{DEVKIT_LOCATION}/include)
 
 # Build plugin
-add_library(tvContact SHARED VolumePreservation.cpp VolumePreservation.hpp TvContact.cpp TvContact.hpp Plugin.cpp Smooth.hpp)
+add_library(tvContact SHARED src/VolumePreservation.cpp src/VolumePreservation.hpp src/TvContact.cpp src/TvContact.hpp src/Plugin.cpp src/Smooth.hpp)
