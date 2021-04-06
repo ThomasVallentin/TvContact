@@ -153,9 +153,6 @@ MStatus TvContact::deform(MDataBlock& block, MItGeometry& itGeo,
 
     MFnMesh fnCachedMesh(cachedMeshData);
 
-    // TODO: Getting all the points from the iterator at once
-    //       because it's faster than iterating testedPoint per testedPoint
-
     // Intersector initialisation
     MMeshIntersector intersector;
     intersector.create(oColliderMesh);
@@ -340,36 +337,10 @@ MStatus TvContact::deform(MDataBlock& block, MItGeometry& itGeo,
     }
 
     for ( itGeo.reset() ; !itGeo.isDone() ; itGeo.next()) {
-//        std::cout << "itGeo.index() : " << itGeo.index() << std::endl;
-//        std::cout << "strengthPerVertex[itGeo.index()] : " << strengthPerVertex[itGeo.index()] << std::endl;
         itGeo.setPosition(itGeo.position() + itGeo.normal() * strengthPerVertex[itGeo.index()] * volumeDelta  * preserveVolume / totalStrength);
     }
 
-//    std::cout << "strengthPerVertex : " << strengthPerVertex << std::endl;
-//    std::cout << "totalStrength : " << totalStrength << std::endl;
     std::cout << "volumeDelta : " << volumeDelta << std::endl;
-
-//    (std::cos(length(point - closestpoint) / preserveVolumeRadius) + 1) / 2
-
-    // Get all triangles normals
-
-
-//    itGeo.reset();
-//    double volumePerVertice = volumeDelta / (double)(itGeo.count() - collidedIds.size());
-//    for ( ; !itGeo.isDone(); itGeo.next()) {
-//        // If the testedPoint has not collided, skip the volume preservation
-//        bool hasCollided = false;
-//        for (const auto & colId : collidedIds)
-//            if (itGeo.index() == colId) {
-//                hasCollided = true;
-//                break;
-//            }
-//        if (hasCollided)
-//            continue;
-//
-//        itGeo.setPosition(itGeo.position() + itGeo.normal() * volumePerVertice * preserveVolume * env);
-//    }
-
 
     // Get final position and sets it to the cache
     fnCachedMesh.copy(oInputMesh, cachedMeshData);
